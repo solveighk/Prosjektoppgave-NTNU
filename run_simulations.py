@@ -1,8 +1,14 @@
 
+
+from energy_costs import get_charging_cost, get_diesel_costs, get_diesel_returns, get_electricity_parameters
+from simulation_input import monte_carlo_simulation
+from truck import Truck
+import matplotlib.pyplot as plt
+
 from cost_functions import get_opex, get_pvf, get_tco, get_tco_penalty
 from energy_costs import get_charging_cost, get_diesel_costs, get_diesel_returns, get_electricity_parameters
+import numpy as np
 
-from truck import Truck
 
 # Monte Carlo simulation of total ownership costs with uncertainty 
 def monte_carlo_simulation(truck_el, truck_diesel, simulation_type, no_simulations, diesel_returns, el_price_ret, other_el_costs, toll, interest_rate, penalty = True):
@@ -80,35 +86,66 @@ def monte_carlo_simulation(truck_el, truck_diesel, simulation_type, no_simulatio
   
   return tco_list, total_energy_list, total_other_opex_list, total_capex_list
 
-# Til geometrisk sannsynlighetsfordeling
-dager = 2192 # dager fra starten av 2023 til slutten av 2028. Regner et års ledetid for utbygging slik at det må være klart innen 01.01.2029.
-forventet = dager/2 # Forventningsverdi er halvveis i perioden
+
+
+def histogram(mcs,title, x_low, x_high, y_high):
+  plt.xlabel("TCO")
+  plt.ylabel("Occurences")
+  title = "Monte Carlo Simulation: " + title
+  plt.title(title)
+  plt.hist(mcs, bins = 100)
+  plt.ylim(0,y_high)
+  plt.xlim(x_low,x_high)
+  plt.show()
+
+# parameters for geometric probability distribution
+dager = 2192 # days from start of 2023 to end of 2028. 
+forventet = dager/2 # expected value halfway in the period
 p = 1/forventet 
+
+#fixed parameters
 toll = 87500
 discount_rate = 0.09
+
 # Initializes trucks objects
 el_truck = Truck(yearly_dist = 50000, fueltype = "el", consumption_per_km = 1.7, lifetime = 7, truck_value = 5000000, residual_rate = 0.2, maintenance_rate = 1, other_cost_rate = 1, comparable_truck_value = 2000000, name = "el")
 diesel_truck = Truck(yearly_dist = 50000, fueltype = "diesel", consumption_per_km = 0.4, lifetime = 7, truck_value = 2000000, residual_rate = 0.2, maintenance_rate = 1.5, other_cost_rate = 1, comparable_truck_value = 5000000, name = "diesel")
 
-#FORBUKR Diesel: kW/per km
 # Number of Monte Carlo simulations
-no_simulations = 10
+no_simulations = 20000
 
 # Diesel returns
 d_returns = get_diesel_returns()
+
 # ELECTRICITY AND CHARGING PRICES, 3 CASES FOR SURCHARGE RATE
 # Low surcharge on charging stations (2 NOK/kWh)
 el_prices_NOK2, other_el_costs_NOK2 = get_electricity_parameters(2)
-
 # Medium surcharge on charging stations (5 NOK/kWh)
 el_prices_NOK5, other_el_costs_NOK5 = get_electricity_parameters(5)
-
-# Medium surcharge on charging stations (8 NOK/kWh)
+# High surcharge on charging stations (8 NOK/kWh)
 el_prices_NOK8, other_el_costs_NOK8 = get_electricity_parameters(8)
 
-mcs_el_tillegg_NOK2, _, _, _ = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK2, other_el_costs_NOK2, toll,  discount_rate,True)
-#mcs_el_tillegg_NOK5, _, _, _ = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK5, other_el_costs_NOK5, toll, discount_rate, True)
-#mcs_el_tillegg_NOK8, _, _, _ = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK8, other_el_costs_NOK8, toll, discount_rate, True)
 
-print(mcs_el_tillegg_NOK2)
+
+#simulations with infrastructure uncertainty
+mcs_el_tillegg_NOK2, _, _, _ = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK2, other_el_costs_NOK2, toll,  discount_rate,True)
+mcs_el_tillegg_NOK5, _, _, _ = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK5, other_el_costs_NOK5, toll, discount_rate, True)
+mcs_el_tillegg_NOK8, _, _, _ = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK8, other_el_costs_NOK8, toll, discount_rate, True)
+
+# Histograms for infrastructure uncertainty
+histogram( mcs_el_tillegg_NOK2, "2 NOK/kWh surcharge",5000000, 10000000, 1500)
+histogram(mcs_el_tillegg_NOK5,"5 NOK/kWh surcharge", 5000000, 10000000, 1500)
+histogram(mcs_el_tillegg_NOK8,"8 NOK/kWh surcharge", 5000000, 10000000, 1500)
+
+#Simulations for no infrastructure uncertainty
+mcs_NOK2_without_penalty_el, energy, otheropex, capex = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK2, other_el_costs_NOK2, toll, discount_rate, False)
+mcs_NOK5_without_penalty_el, energy, otheropex, capex = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK5, other_el_costs_NOK5, toll, discount_rate, False)
+mcs_NOK8_without_penalty_el, energy, otheropex, capex = monte_carlo_simulation(el_truck, diesel_truck, "el", no_simulations, d_returns, el_prices_NOK8, other_el_costs_NOK8, toll, discount_rate, False)
+histogram(mcs_NOK2_without_penalty_el, "Surcharge NOK2, no penalty", 4000000, 7000000, 1000)
+histogram(mcs_NOK5_without_penalty_el, "Surcharge NOK5, no penalty", 4500000, 8500000, 1000)
+histogram(mcs_NOK8_without_penalty_el, "Surcharge NOK8, no penalty", 4000000, 10000000, 1000)
+
+#Simulations for a diesel truck
+tco_diesel, energy_diesel, otheropex_diesel, capex_diesel = monte_carlo_simulation(el_truck, diesel_truck, "diesel", no_simulations, d_returns, el_prices_NOK5, other_el_costs_NOK5, toll,  discount_rate, False)
+histogram(tco_diesel, "mcs_diesel", 4000000, 7000000, 1000)
 

@@ -1,13 +1,3 @@
-#imports
-import truck
-import random
-#import numpy as np
-from random import betavariate
-from random import randint as randint
-from statistics import mean, median, stdev
-#import matplotlib.mlab as mlab
-
-
 
 #present value factor
 def get_pvf(i, N):
