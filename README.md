@@ -3,4 +3,4 @@
 
 To run simulations, go to the file run_simulations.py. 
 
-Comment out the monte carlo simulations and historgram you don't want to generate, and run the file. 
+Comment out the monte carlo simulations and histograms you don't want to include, and run the file. 
